@@ -644,6 +644,12 @@ button {
   gap: 10px;
 }
 
+.search-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .search-close-btn {
   display: none;
   min-height: 38px;
@@ -657,6 +663,21 @@ button {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   box-shadow: 0 6px 12px rgba(12, 27, 21, 0.06);
+}
+
+.search-add-custom-btn {
+  display: none;
+  min-height: 38px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(14, 91, 59, 0.24);
+  background: linear-gradient(135deg, #1e8d60, #0e5b3b);
+  color: #ffffff;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  box-shadow: 0 10px 18px rgba(14, 91, 59, 0.18);
 }
 
 .custom-fields {
@@ -849,26 +870,38 @@ button {
 
 .item-card-forestry {
   background:
-    linear-gradient(135deg, rgba(20, 168, 109, 0.22), rgba(255, 255, 255, 0.12)),
-    linear-gradient(180deg, rgba(240, 255, 247, 0.98), rgba(219, 248, 231, 0.92));
+    linear-gradient(135deg, rgba(20, 168, 109, 0.34), rgba(125, 234, 180, 0.16), rgba(255, 255, 255, 0.08)),
+    linear-gradient(180deg, rgba(233, 255, 242, 1), rgba(198, 245, 216, 0.96));
+  border-color: rgba(20, 168, 109, 0.28);
+  box-shadow:
+    0 14px 24px rgba(11, 88, 56, 0.1),
+    0 0 0 1px rgba(20, 168, 109, 0.08);
 }
 
 .item-card-mlw {
   background:
-    linear-gradient(135deg, rgba(207, 43, 43, 0.2), rgba(255, 255, 255, 0.12)),
-    linear-gradient(180deg, rgba(255, 245, 245, 0.98), rgba(252, 224, 224, 0.92));
+    linear-gradient(135deg, rgba(207, 43, 43, 0.34), rgba(255, 133, 133, 0.16), rgba(255, 255, 255, 0.08)),
+    linear-gradient(180deg, rgba(255, 237, 237, 1), rgba(250, 198, 198, 0.96));
+  border-color: rgba(207, 43, 43, 0.28);
+  box-shadow:
+    0 14px 24px rgba(124, 25, 25, 0.1),
+    0 0 0 1px rgba(207, 43, 43, 0.08);
 }
 
 .item-card-mixed {
   background:
-    linear-gradient(135deg, rgba(20, 168, 109, 0.12), rgba(193, 55, 55, 0.12), rgba(255, 255, 255, 0.1)),
-    linear-gradient(180deg, rgba(255, 251, 246, 0.96), rgba(245, 240, 236, 0.88));
+    linear-gradient(135deg, rgba(20, 168, 109, 0.22), rgba(193, 55, 55, 0.22), rgba(255, 255, 255, 0.08)),
+    linear-gradient(180deg, rgba(255, 248, 241, 0.98), rgba(243, 233, 225, 0.92));
 }
 
 .item-card-neutral {
   background:
-    linear-gradient(135deg, rgba(113, 126, 138, 0.16), rgba(255, 255, 255, 0.12)),
-    linear-gradient(180deg, rgba(248, 249, 250, 0.98), rgba(236, 239, 242, 0.9));
+    linear-gradient(135deg, rgba(108, 118, 128, 0.11), rgba(255, 255, 255, 0.1)),
+    linear-gradient(180deg, rgba(244, 246, 247, 0.98), rgba(226, 231, 235, 0.94));
+  border-color: rgba(108, 118, 128, 0.16);
+  box-shadow:
+    0 8px 18px rgba(43, 53, 61, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.65);
 }
 
 .item-card::before {
@@ -881,11 +914,13 @@ button {
 }
 
 .item-card-forestry::before {
-  background: linear-gradient(90deg, rgba(20, 168, 109, 1), rgba(128, 235, 183, 0.84), transparent 88%);
+  height: 4px;
+  background: linear-gradient(90deg, rgba(8, 146, 92, 1), rgba(71, 229, 150, 0.96), rgba(189, 255, 223, 0.72), transparent 88%);
 }
 
 .item-card-mlw::before {
-  background: linear-gradient(90deg, rgba(207, 43, 43, 1), rgba(255, 128, 128, 0.84), transparent 88%);
+  height: 4px;
+  background: linear-gradient(90deg, rgba(191, 24, 24, 1), rgba(240, 68, 68, 0.98), rgba(255, 176, 176, 0.76), transparent 88%);
 }
 
 .item-card-mixed::before {
@@ -924,21 +959,39 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 13px;
-  border-radius: 14px;
+  padding: 11px 15px;
+  border-radius: 16px;
   background:
-    linear-gradient(135deg, rgba(31, 122, 83, 0.14), rgba(217, 166, 79, 0.08)),
-    linear-gradient(135deg, #f3faf6, #fffdf7);
-  color: #081611;
-  font-size: 1.08rem;
+    radial-gradient(circle at 18% 18%, rgba(255, 255, 255, 0.96), transparent 34%),
+    linear-gradient(135deg, rgba(33, 148, 100, 0.32), rgba(255, 191, 87, 0.18)),
+    linear-gradient(135deg, #fcfffd, #f6fff9 52%, #fff8ea);
+  color: #04100c;
+  font-size: 1.14rem;
   font-weight: 900;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.07em;
   line-height: 1;
   box-shadow:
-    0 10px 20px rgba(18, 54, 40, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.82);
-  border: 1px solid rgba(31, 122, 83, 0.18);
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.55);
+    0 0 0 1px rgba(31, 122, 83, 0.14),
+    0 0 0 4px rgba(78, 212, 149, 0.12),
+    0 14px 28px rgba(18, 54, 40, 0.16),
+    0 0 24px rgba(78, 212, 149, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(31, 122, 83, 0.28);
+  text-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.74),
+    0 0 14px rgba(78, 212, 149, 0.18);
+  position: relative;
+  overflow: hidden;
+}
+
+.sku-chip::after {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.34), transparent 46%, rgba(255, 210, 120, 0.18));
+  opacity: 0.9;
 }
 
 .item-name {
@@ -1013,41 +1066,41 @@ button {
 
 .detail-forestry {
   background:
-    linear-gradient(135deg, rgba(20, 168, 109, 0.24), rgba(255, 255, 255, 0.18)),
-    linear-gradient(180deg, rgba(228, 255, 239, 0.98), rgba(201, 243, 218, 0.9));
-  border-color: rgba(20, 168, 109, 0.26);
+    linear-gradient(135deg, rgba(20, 168, 109, 0.34), rgba(166, 255, 211, 0.18)),
+    linear-gradient(180deg, rgba(218, 255, 233, 1), rgba(178, 239, 202, 0.94));
+  border-color: rgba(20, 168, 109, 0.34);
 }
 
 .detail-forestry .detail-label,
 .detail-forestry strong {
-  color: #0f724a;
-  text-shadow: 0 4px 18px rgba(20, 168, 109, 0.18);
+  color: #095f3b;
+  text-shadow: 0 4px 18px rgba(20, 168, 109, 0.28);
 }
 
 .detail-mlw {
   background:
-    linear-gradient(135deg, rgba(207, 43, 43, 0.24), rgba(255, 255, 255, 0.18)),
-    linear-gradient(180deg, rgba(255, 233, 233, 0.98), rgba(250, 207, 207, 0.9));
-  border-color: rgba(207, 43, 43, 0.24);
+    linear-gradient(135deg, rgba(207, 43, 43, 0.34), rgba(255, 191, 191, 0.18)),
+    linear-gradient(180deg, rgba(255, 223, 223, 1), rgba(245, 184, 184, 0.94));
+  border-color: rgba(207, 43, 43, 0.34);
 }
 
 .detail-mlw .detail-label,
 .detail-mlw strong {
-  color: #b01f1f;
-  text-shadow: 0 4px 18px rgba(207, 43, 43, 0.18);
+  color: #971414;
+  text-shadow: 0 4px 18px rgba(207, 43, 43, 0.28);
 }
 
 .detail-location {
   background:
-    linear-gradient(135deg, rgba(113, 126, 138, 0.16), rgba(255, 255, 255, 0.18)),
-    linear-gradient(180deg, rgba(247, 248, 249, 0.96), rgba(231, 235, 238, 0.88));
-  border-color: rgba(112, 126, 138, 0.16);
+    linear-gradient(135deg, rgba(113, 126, 138, 0.12), rgba(255, 255, 255, 0.14)),
+    linear-gradient(180deg, rgba(243, 245, 246, 0.98), rgba(223, 228, 232, 0.92));
+  border-color: rgba(112, 126, 138, 0.14);
 }
 
 .detail-location .detail-label,
 .detail-location strong {
-  color: #4f606d;
-  text-shadow: 0 4px 16px rgba(113, 126, 138, 0.12);
+  color: #5f6d78;
+  text-shadow: none;
 }
 
 .detail-van {
@@ -1367,10 +1420,10 @@ button {
 }
 
 .scroll-top-btn::before {
-  content: "Top";
+  content: "Menu";
   color: #ffffff;
   font-family: "Sora", system-ui, sans-serif;
-  font-size: 0.9rem;
+  font-size: 0.82rem;
   font-weight: 800;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -1689,11 +1742,14 @@ button {
   }
 
   .sku-chip {
-    font-size: 0.7rem;
-    padding: 4px 7px;
+    font-size: 0.78rem;
+    padding: 5px 9px;
     width: fit-content;
-    border-radius: 9px;
-    box-shadow: none;
+    border-radius: 11px;
+    box-shadow:
+      0 0 0 1px rgba(31, 122, 83, 0.12),
+      0 0 0 3px rgba(78, 212, 149, 0.1),
+      0 8px 16px rgba(18, 54, 40, 0.12);
   }
 
   .item-name {
@@ -1850,6 +1906,17 @@ button {
 
   .scroll-top-btn::before {
     font-size: 0.82rem;
+  }
+
+  .search-head-actions {
+    gap: 6px;
+  }
+
+  .search-add-custom-btn,
+  .search-close-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 
   body.search-active .hero,

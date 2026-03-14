@@ -1,6 +1,7 @@
 const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbyXte3FVOOSgv5NEHiEpQVNzwjHFObwzSQBnWZXpjyisjbagI9YnNgElMD284MvVYFc/exec";
 const LOCAL_STORAGE_KEY = "inventory_hub_records";
 const INVENTORY_LOCAL_STORAGE_KEY = "inventory_hub_catalog";
+const UI_STATE_STORAGE_KEY = "inventory_hub_ui_state";
 const LEGACY_LOCAL_STORAGE_KEY = "p_car";
 const SYNC_INTERVAL_MS = 20000;
 const LOCAL_PROTECT_MS = 60000;
@@ -15,7 +16,8 @@ const state = {
   hasPendingLocalChanges: false,
   modalMode: "edit",
   modalSku: "",
-  modalName: ""
+  modalName: "",
+  clearSearchOnModalClose: false
 };
 
 const elements = {};
@@ -31,6 +33,7 @@ function cacheElements() {
     "refreshBtn", "exportBtn", "itemCount", "missingLocationCount", "vanQtyCount",
     "vanOnlyToggle", "ltOnlyToggle", "prOnlyToggle",
     "addCustomBtn",
+    "searchAddCustomBtn",
     "searchCloseBtn",
     "scrollTopBtn",
     "modalBack", "modalSkuText", "customFields", "customSkuInput", "customNameInput", "locationInput", "qtyInput",
@@ -202,12 +205,53 @@ function loadInventory() {
   }
 }
 
+function loadUiState() {
+  try {
+    const raw = localStorage.getItem(UI_STATE_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw);
+    return {
+      query: String(parsed.query || ""),
+      vanOnly: Boolean(parsed.vanOnly),
+      ltOnly: Boolean(parsed.ltOnly),
+      prOnly: Boolean(parsed.prOnly)
+    };
+  } catch (error) {
+    console.error("Could not read local UI state", error);
+    return null;
+  }
+}
+
 function writeLocalRecords(list) {
   localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(sanitizeRecordList(list)));
 }
 
 function writeLocalInventory(list) {
   localStorage.setItem(INVENTORY_LOCAL_STORAGE_KEY, JSON.stringify(dedupeInventory(list)));
+}
+
+function writeLocalUiState() {
+  localStorage.setItem(UI_STATE_STORAGE_KEY, JSON.stringify({
+    query: elements.searchInput.value,
+    vanOnly: elements.vanOnlyToggle.checked,
+    ltOnly: elements.ltOnlyToggle.checked,
+    prOnly: elements.prOnlyToggle.checked
+  }));
+}
+
+function restoreUiState() {
+  const uiState = loadUiState();
+  if (!uiState) {
+    return;
+  }
+
+  elements.searchInput.value = uiState.query;
+  elements.vanOnlyToggle.checked = uiState.vanOnly;
+  elements.ltOnlyToggle.checked = uiState.ltOnly;
+  elements.prOnlyToggle.checked = uiState.prOnly;
 }
 
 function getRecordMap(records = state.records) {
@@ -577,6 +621,7 @@ function getRowBySku(sku) {
 }
 
 function openModal(row) {
+  state.clearSearchOnModalClose = Boolean(elements.searchInput.value.trim());
   state.modalMode = "edit";
   state.modalSku = row.sku;
   state.modalName = row.name;
@@ -598,6 +643,7 @@ function openModal(row) {
 }
 
 function openCreateModal() {
+  state.clearSearchOnModalClose = false;
   state.modalMode = "custom";
   state.modalSku = "";
   state.modalName = "";
@@ -621,6 +667,15 @@ function openCreateModal() {
 function closeModal() {
   elements.modalBack.classList.add("hidden");
   elements.modalBack.setAttribute("aria-hidden", "true");
+
+  if (state.clearSearchOnModalClose) {
+    state.clearSearchOnModalClose = false;
+    elements.searchInput.value = "";
+    document.body.classList.remove("search-active");
+    resetRenderLimit();
+    writeLocalUiState();
+    renderInventory();
+  }
 }
 
 async function quickAddVan(sku) {
@@ -644,7 +699,7 @@ function updateScrollTopButton() {
     return;
   }
 
-  elements.scrollTopBtn.classList.toggle("hidden", window.scrollY < 520);
+  elements.scrollTopBtn.classList.toggle("hidden", window.scrollY < 260);
 }
 
 function buildRecordPayload() {
@@ -863,6 +918,7 @@ function scheduleRender() {
   resetRenderLimit();
   renderTimer = window.setTimeout(() => {
     renderTimer = null;
+    writeLocalUiState();
     renderInventory();
   }, 220);
 }
@@ -888,26 +944,34 @@ function bindEvents() {
     elements.searchInput.blur();
     document.body.classList.remove("search-active");
     resetRenderLimit();
+    writeLocalUiState();
     renderInventory();
   });
   elements.vanOnlyToggle.addEventListener("change", () => {
     resetRenderLimit();
+    writeLocalUiState();
     renderInventory();
   });
   elements.ltOnlyToggle.addEventListener("change", () => {
     resetRenderLimit();
+    writeLocalUiState();
     renderInventory();
   });
   elements.prOnlyToggle.addEventListener("change", () => {
     resetRenderLimit();
+    writeLocalUiState();
     renderInventory();
   });
   elements.scrollTopBtn.addEventListener("click", () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
+    window.setTimeout(() => {
+      elements.searchInput.focus({ preventScroll: true });
+    }, 220);
   });
   elements.refreshBtn.addEventListener("click", () => syncFromServer());
   elements.exportBtn.addEventListener("click", exportInventory);
   elements.addCustomBtn.addEventListener("click", openCreateModal);
+  elements.searchAddCustomBtn.addEventListener("click", openCreateModal);
   elements.results.addEventListener("click", (event) => {
     const loadMoreButton = event.target.closest("[data-action='load-more']");
     if (loadMoreButton) {
@@ -965,6 +1029,11 @@ function bindEvents() {
       closeModal();
     }
   });
+  window.addEventListener("pagehide", writeLocalUiState);
+  window.addEventListener("pageshow", () => {
+    restoreUiState();
+    renderInventory();
+  });
   window.addEventListener("storage", (event) => {
     if (event.key === LOCAL_STORAGE_KEY) {
       state.records = loadRecords();
@@ -979,6 +1048,7 @@ function init() {
   cacheElements();
   state.inventory = loadInventory();
   state.records = loadRecords();
+  restoreUiState();
   bindEvents();
   updateScrollTopButton();
   renderInventory();
