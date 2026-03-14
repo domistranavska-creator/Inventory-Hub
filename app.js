@@ -32,7 +32,6 @@ function cacheElements() {
     "vanOnlyToggle", "ltOnlyToggle", "prOnlyToggle",
     "addCustomBtn",
     "searchCloseBtn",
-    "mobileSearchBtn", "mobileAddBtn", "mobileVanBtn",
     "scrollTopBtn",
     "modalBack", "modalSkuText", "customFields", "customSkuInput", "customNameInput", "locationInput", "qtyInput",
     "confirmBtn", "modalError", "closeModalBtn", "cancelModalBtn", "incQtyBtn", "decQtyBtn"
@@ -434,10 +433,6 @@ function updateSummary(rows) {
     elements.itemCount.textContent = `${allRows.length} items`;
     elements.missingLocationCount.textContent = `${missingLocation} without location`;
     elements.vanQtyCount.textContent = `${totalVanQty} pcs in van`;
-  }
-
-  if (elements.mobileVanBtn) {
-    elements.mobileVanBtn.classList.toggle("is-active", vanOnly);
   }
 
   if (!state.inventory.length && !state.records.length) {
@@ -910,18 +905,6 @@ function bindEvents() {
   elements.refreshBtn.addEventListener("click", () => syncFromServer());
   elements.exportBtn.addEventListener("click", exportInventory);
   elements.addCustomBtn.addEventListener("click", openCreateModal);
-  elements.mobileAddBtn.addEventListener("click", openCreateModal);
-  elements.mobileSearchBtn.addEventListener("click", () => {
-    window.scrollTo({ top: 0, behavior: "auto" });
-    window.setTimeout(() => {
-      elements.searchInput.focus({ preventScroll: true });
-      elements.searchInput.select?.();
-    }, 120);
-  });
-  elements.mobileVanBtn.addEventListener("click", () => {
-    elements.vanOnlyToggle.checked = !elements.vanOnlyToggle.checked;
-    renderInventory();
-  });
   elements.results.addEventListener("click", (event) => {
     const loadMoreButton = event.target.closest("[data-action='load-more']");
     if (loadMoreButton) {
