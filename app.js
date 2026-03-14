@@ -515,6 +515,7 @@ function updateSummary(rows) {
 function renderInventory() {
   const rows = getFilteredRows();
   const query = elements.searchInput.value.trim();
+  updateScrollTopButton();
   updateSummary(rows);
 
   if (!hasActiveQueryOrFilters()) {
@@ -699,7 +700,8 @@ function updateScrollTopButton() {
     return;
   }
 
-  elements.scrollTopBtn.classList.toggle("hidden", window.scrollY < 260);
+  const threshold = hasActiveQueryOrFilters() ? 140 : 260;
+  elements.scrollTopBtn.classList.toggle("hidden", window.scrollY < threshold);
 }
 
 function buildRecordPayload() {
