@@ -56,7 +56,10 @@
         </div>
 
         <label class="search-wrap search-wrap-primary" for="searchInput">
-          <span class="search-label">Search</span>
+          <div class="search-head">
+            <span class="search-label">Search</span>
+            <button id="searchCloseBtn" class="search-close-btn" type="button">Close</button>
+          </div>
           <input
             id="searchInput"
             class="search-input"
@@ -65,13 +68,6 @@
             placeholder="Search by code or name"
           >
         </label>
-
-        <div id="recentWrap" class="recent-wrap hidden">
-          <div class="recent-head">
-            <span>Recent items</span>
-          </div>
-          <div id="recentList" class="recent-list"></div>
-        </div>
 
         <div class="filter-row">
           <label class="check-row check-row-forestry" for="ltOnlyToggle">

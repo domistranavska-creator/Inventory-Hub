@@ -1,24 +1,25 @@
 const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbyXte3FVOOSgv5NEHiEpQVNzwjHFObwzSQBnWZXpjyisjbagI9YnNgElMD284MvVYFc/exec";
 const LOCAL_STORAGE_KEY = "inventory_hub_records";
 const INVENTORY_LOCAL_STORAGE_KEY = "inventory_hub_catalog";
-const RECENT_SKUS_STORAGE_KEY = "inventory_hub_recent_skus";
 const LEGACY_LOCAL_STORAGE_KEY = "p_car";
 const SYNC_INTERVAL_MS = 20000;
 const LOCAL_PROTECT_MS = 60000;
 const state = {
   inventory: [],
   records: [],
+  rowsCache: null,
+  renderLimit: 80,
   syncTimer: null,
   lastRemoteSyncAt: 0,
   lastLocalMutationAt: 0,
   hasPendingLocalChanges: false,
   modalMode: "edit",
   modalSku: "",
-  modalName: "",
-  recentSkus: []
+  modalName: ""
 };
 
 const elements = {};
+let renderTimer = null;
 
 function byId(id) {
   return document.getElementById(id);
@@ -30,8 +31,8 @@ function cacheElements() {
     "refreshBtn", "exportBtn", "itemCount", "missingLocationCount", "vanQtyCount",
     "vanOnlyToggle", "ltOnlyToggle", "prOnlyToggle",
     "addCustomBtn",
+    "searchCloseBtn",
     "mobileSearchBtn", "mobileAddBtn", "mobileVanBtn",
-    "recentWrap", "recentList",
     "scrollTopBtn",
     "modalBack", "modalSkuText", "customFields", "customSkuInput", "customNameInput", "locationInput", "qtyInput",
     "confirmBtn", "modalError", "closeModalBtn", "cancelModalBtn", "incQtyBtn", "decQtyBtn"
@@ -210,37 +211,6 @@ function writeLocalInventory(list) {
   localStorage.setItem(INVENTORY_LOCAL_STORAGE_KEY, JSON.stringify(dedupeInventory(list)));
 }
 
-function loadRecentSkus() {
-  try {
-    const raw = localStorage.getItem(RECENT_SKUS_STORAGE_KEY);
-    if (!raw) {
-      return [];
-    }
-
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed)
-      ? parsed.map((value) => String(value || "").trim()).filter(Boolean).slice(0, 6)
-      : [];
-  } catch (error) {
-    console.error("Could not read recent items", error);
-    return [];
-  }
-}
-
-function writeRecentSkus(list) {
-  localStorage.setItem(RECENT_SKUS_STORAGE_KEY, JSON.stringify(list.slice(0, 6)));
-}
-
-function rememberRecentSku(sku) {
-  const cleanSku = String(sku || "").trim();
-  if (!cleanSku) {
-    return;
-  }
-
-  state.recentSkus = [cleanSku, ...state.recentSkus.filter((item) => item !== cleanSku)].slice(0, 6);
-  writeRecentSkus(state.recentSkus);
-}
-
 function getRecordMap(records = state.records) {
   const map = new Map();
 
@@ -258,6 +228,14 @@ function getRecordMap(records = state.records) {
   });
 
   return map;
+}
+
+function invalidateRowsCache() {
+  state.rowsCache = null;
+}
+
+function resetRenderLimit() {
+  state.renderLimit = 80;
 }
 
 function formatTime(timestamp) {
@@ -313,11 +291,16 @@ function applyRemoteRecords(remoteRecords, options = {}) {
   }
 
   state.records = sanitizeRecordList(remoteRecords);
+  invalidateRowsCache();
   writeLocalRecords(state.records);
   return true;
 }
 
 function buildRows() {
+  if (state.rowsCache) {
+    return state.rowsCache;
+  }
+
   const recordMap = getRecordMap();
 
   const merged = state.inventory.map((item) => {
@@ -350,10 +333,11 @@ function buildRows() {
     });
   });
 
-  return merged.sort((a, b) => a.sku.localeCompare(b.sku, undefined, {
+  state.rowsCache = merged.sort((a, b) => a.sku.localeCompare(b.sku, undefined, {
     numeric: true,
     sensitivity: "base"
   }));
+  return state.rowsCache;
 }
 
 function getFilteredRows() {
@@ -384,19 +368,10 @@ function getFilteredRows() {
   }
 
   if (!query) {
-    const recentSet = new Set(state.recentSkus);
-    return filtered.sort((a, b) => {
-      const aRecent = recentSet.has(a.sku) ? 1 : 0;
-      const bRecent = recentSet.has(b.sku) ? 1 : 0;
-      if (aRecent !== bRecent) {
-        return bRecent - aRecent;
-      }
-
-      return a.sku.localeCompare(b.sku, undefined, {
-        numeric: true,
-        sensitivity: "base"
-      });
-    });
+    return filtered.sort((a, b) => a.sku.localeCompare(b.sku, undefined, {
+      numeric: true,
+      sensitivity: "base"
+    }));
   }
 
   return filtered
@@ -444,45 +419,23 @@ function stockText(row) {
   return `${row.stockQty || 0} pcs`;
 }
 
-function renderRecentItems() {
-  if (!elements.recentWrap || !elements.recentList) {
-    return;
-  }
-
-  const recentRows = state.recentSkus
-    .map((sku) => getRowBySku(sku))
-    .filter(Boolean)
-    .slice(0, 6);
-
-  const shouldShow = recentRows.length > 0 && !elements.searchInput.value.trim() && !elements.vanOnlyToggle.checked && !elements.ltOnlyToggle.checked && !elements.prOnlyToggle.checked;
-  elements.recentWrap.classList.toggle("hidden", !shouldShow);
-
-  if (!shouldShow) {
-    elements.recentList.innerHTML = "";
-    return;
-  }
-
-  elements.recentList.innerHTML = recentRows.map((row) => `
-    <button class="recent-chip" type="button" data-action="recent-item" data-sku="${escapeHtml(row.sku)}">
-      <span class="recent-chip-sku">${escapeHtml(row.sku)}</span>
-      <span class="recent-chip-name">${escapeHtml(row.name)}</span>
-    </button>
-  `).join("");
-}
-
-
 function updateSummary(rows) {
-  const allRows = buildRows();
-  const missingLocation = allRows.filter((row) => !row.location).length;
-  const totalVanQty = allRows.reduce((sum, row) => sum + row.vanQty, 0);
+  const isCompactMobile = window.innerWidth <= 640;
   const query = elements.searchInput.value.trim();
   const vanOnly = Boolean(elements.vanOnlyToggle.checked);
   const ltOnly = Boolean(elements.ltOnlyToggle.checked);
   const prOnly = Boolean(elements.prOnlyToggle.checked);
 
-  elements.itemCount.textContent = `${allRows.length} items`;
-  elements.missingLocationCount.textContent = `${missingLocation} without location`;
-  elements.vanQtyCount.textContent = `${totalVanQty} pcs in van`;
+  if (!isCompactMobile) {
+    const allRows = buildRows();
+    const missingLocation = allRows.filter((row) => !row.location).length;
+    const totalVanQty = allRows.reduce((sum, row) => sum + row.vanQty, 0);
+
+    elements.itemCount.textContent = `${allRows.length} items`;
+    elements.missingLocationCount.textContent = `${missingLocation} without location`;
+    elements.vanQtyCount.textContent = `${totalVanQty} pcs in van`;
+  }
+
   if (elements.mobileVanBtn) {
     elements.mobileVanBtn.classList.toggle("is-active", vanOnly);
   }
@@ -493,7 +446,9 @@ function updateSummary(rows) {
   }
 
   if (!hasActiveQueryOrFilters()) {
-    elements.searchMeta.textContent = "";
+    elements.searchMeta.textContent = rows.length > state.renderLimit
+      ? `Showing first ${state.renderLimit} of ${rows.length} items.`
+      : "";
     return;
   }
 
@@ -504,20 +459,24 @@ function updateSummary(rows) {
     if (prOnly) activeFilters.push("MLW Tools");
 
     elements.searchMeta.textContent = activeFilters.length
-      ? `Showing ${rows.length} items filtered by ${activeFilters.join(", ")}.`
+      ? rows.length > state.renderLimit
+        ? `Showing first ${state.renderLimit} of ${rows.length} items filtered by ${activeFilters.join(", ")}.`
+        : `Showing ${rows.length} items filtered by ${activeFilters.join(", ")}.`
       : `Showing ${rows.length} items from the shared inventory overview.`;
     return;
   }
 
   elements.searchMeta.textContent = rows.length
-    ? `Showing ${rows.length} matches for "${query}".`
+    ? rows.length > state.renderLimit
+      ? `Showing first ${state.renderLimit} of ${rows.length} matches for "${query}".`
+      : `Showing ${rows.length} matches for "${query}".`
     : `Nothing matched "${query}".`;
 }
 
 function renderInventory() {
   const rows = getFilteredRows();
+  const query = elements.searchInput.value.trim();
   updateSummary(rows);
-  renderRecentItems();
 
   if (!hasActiveQueryOrFilters()) {
     elements.results.innerHTML = `
@@ -529,12 +488,23 @@ function renderInventory() {
     return;
   }
 
+  if (query && query.length < 2 && !elements.vanOnlyToggle.checked && !elements.ltOnlyToggle.checked && !elements.prOnlyToggle.checked) {
+    elements.results.innerHTML = `
+      <div class="empty-state empty-state-guide">
+        <strong>Keep typing</strong>
+        <span>Type at least 2 characters to show results.</span>
+      </div>
+    `;
+    return;
+  }
+
   if (!rows.length) {
     elements.results.innerHTML = `<div class="empty-state">Nothing matched your search. Try a code, name or location.</div>`;
     return;
   }
 
-  elements.results.innerHTML = rows.map((row) => {
+  const visibleRows = rows.slice(0, state.renderLimit);
+  const cardsHtml = visibleRows.map((row) => {
     const status = rowStatus(row);
     const cardClass = row.ltQty > 0 && row.prQty > 0
       ? "item-card-mixed"
@@ -578,7 +548,7 @@ function renderInventory() {
             ${storageBlocks.join("")}
           </div>
         </div>
-        <div class="item-actions">
+        <div class="item-actions ${row.source === "record-only" ? "item-actions-with-delete" : ""}">
           <button class="action-btn action-btn-quick" type="button" data-action="quick-van" data-sku="${escapeHtml(row.sku)}">
             +1 van
           </button>
@@ -594,6 +564,16 @@ function renderInventory() {
       </article>
     `;
   }).join("");
+
+  const loadMoreHtml = rows.length > visibleRows.length
+    ? `
+      <button class="load-more-btn" type="button" data-action="load-more">
+        Show more items (${rows.length - visibleRows.length} left)
+      </button>
+    `
+    : "";
+
+  elements.results.innerHTML = cardsHtml + loadMoreHtml;
 }
 
 function getRowBySku(sku) {
@@ -605,7 +585,6 @@ function openModal(row) {
   state.modalMode = "edit";
   state.modalSku = row.sku;
   state.modalName = row.name;
-  rememberRecentSku(row.sku);
 
   elements.modalSkuText.textContent = `${row.sku} - ${row.name}`;
   elements.customFields.classList.add("hidden");
@@ -655,7 +634,6 @@ async function quickAddVan(sku) {
     return;
   }
 
-  rememberRecentSku(row.sku);
   const nextRecords = getRecordMap(state.records);
   nextRecords.set(normalizeSkuKey(row.sku), sanitizeRecord({
     sku: row.sku,
@@ -693,6 +671,7 @@ function buildRecordPayload() {
 async function saveRecords(records) {
   const cleanList = sanitizeRecordList(records);
   state.records = cleanList;
+  invalidateRowsCache();
   writeLocalRecords(cleanList);
   markLocalMutation();
   renderInventory();
@@ -748,8 +727,6 @@ async function submitModal() {
 
   const nextRecords = getRecordMap(state.records);
   nextRecords.set(normalizeSkuKey(payload.sku), payload);
-  rememberRecentSku(payload.sku);
-
   closeModal();
   await saveRecords(Array.from(nextRecords.values()));
 }
@@ -793,6 +770,7 @@ async function syncFromServer(options = {}) {
     if (itemsOk) {
       const items = Array.isArray(itemsResult.value && itemsResult.value.items) ? itemsResult.value.items : [];
       state.inventory = dedupeInventory(items);
+      invalidateRowsCache();
       writeLocalInventory(state.inventory);
     }
 
@@ -882,9 +860,22 @@ function startSyncTimer() {
   }, SYNC_INTERVAL_MS);
 }
 
+function scheduleRender() {
+  if (renderTimer) {
+    window.clearTimeout(renderTimer);
+  }
+
+  resetRenderLimit();
+  renderTimer = window.setTimeout(() => {
+    renderTimer = null;
+    renderInventory();
+  }, 220);
+}
+
 function bindEvents() {
-  elements.searchInput.addEventListener("input", renderInventory);
+  elements.searchInput.addEventListener("input", scheduleRender);
   elements.searchInput.addEventListener("focus", () => {
+    window.scrollTo({ top: 0, behavior: "auto" });
     document.body.classList.add("search-active");
   });
   elements.searchInput.addEventListener("blur", () => {
@@ -897,9 +888,22 @@ function bindEvents() {
       elements.searchInput.blur();
     }
   });
-  elements.vanOnlyToggle.addEventListener("change", renderInventory);
-  elements.ltOnlyToggle.addEventListener("change", renderInventory);
-  elements.prOnlyToggle.addEventListener("change", renderInventory);
+  elements.searchCloseBtn.addEventListener("click", () => {
+    elements.searchInput.blur();
+    document.body.classList.remove("search-active");
+  });
+  elements.vanOnlyToggle.addEventListener("change", () => {
+    resetRenderLimit();
+    renderInventory();
+  });
+  elements.ltOnlyToggle.addEventListener("change", () => {
+    resetRenderLimit();
+    renderInventory();
+  });
+  elements.prOnlyToggle.addEventListener("change", () => {
+    resetRenderLimit();
+    renderInventory();
+  });
   elements.scrollTopBtn.addEventListener("click", () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   });
@@ -908,7 +912,7 @@ function bindEvents() {
   elements.addCustomBtn.addEventListener("click", openCreateModal);
   elements.mobileAddBtn.addEventListener("click", openCreateModal);
   elements.mobileSearchBtn.addEventListener("click", () => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0, behavior: "auto" });
     window.setTimeout(() => {
       elements.searchInput.focus({ preventScroll: true });
       elements.searchInput.select?.();
@@ -919,6 +923,13 @@ function bindEvents() {
     renderInventory();
   });
   elements.results.addEventListener("click", (event) => {
+    const loadMoreButton = event.target.closest("[data-action='load-more']");
+    if (loadMoreButton) {
+      state.renderLimit += 80;
+      renderInventory();
+      return;
+    }
+
     const quickButton = event.target.closest("[data-action='quick-van']");
     if (quickButton) {
       quickAddVan(quickButton.dataset.sku);
@@ -949,17 +960,6 @@ function bindEvents() {
       }
     }
   });
-  elements.recentList.addEventListener("click", (event) => {
-    const recentButton = event.target.closest("[data-action='recent-item']");
-    if (!recentButton) {
-      return;
-    }
-
-    const row = getRowBySku(recentButton.dataset.sku);
-    if (row) {
-      openModal(row);
-    }
-  });
   elements.closeModalBtn.addEventListener("click", closeModal);
   elements.cancelModalBtn.addEventListener("click", closeModal);
   elements.confirmBtn.addEventListener("click", submitModal);
@@ -982,6 +982,7 @@ function bindEvents() {
   window.addEventListener("storage", (event) => {
     if (event.key === LOCAL_STORAGE_KEY) {
       state.records = loadRecords();
+      invalidateRowsCache();
       renderInventory();
     }
   });
@@ -992,7 +993,6 @@ function init() {
   cacheElements();
   state.inventory = loadInventory();
   state.records = loadRecords();
-  state.recentSkus = loadRecentSkus();
   bindEvents();
   updateScrollTopButton();
   renderInventory();
