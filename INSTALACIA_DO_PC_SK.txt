@@ -1,0 +1,27 @@
+INVENTORY HUB - JEDNODUCHY POSTUP PRE PC
+
+1. Nechaj cely priecinok `apps` spolu:
+   - `van`
+   - `backend`
+   - `SPUSTIT_INVENTORY_HUB.bat`
+
+2. Na spustenie appky staci dvojklik na:
+   `SPUSTIT_INVENTORY_HUB.bat`
+
+3. Ak chces appku pripnut:
+   - daj si `SPUSTIT_INVENTORY_HUB.bat` na plochu
+   - alebo si ju pripni do Start
+
+4. Backend je v Google Apps Scripte, takze v PC sa nic dalsie lokalne neinstaluje.
+
+5. Ak zmenis Apps Script URL, treba ju upravit v:
+   `van\app.js`
+
+6. Ak zmenis KROS token:
+   - meni sa len v Google Apps Script `Script properties`
+   - nemeni sa frontend
+
+7. Ak chces appku otvorit rucne bez batch suboru:
+   otvor:
+   `van\index.html`
+
