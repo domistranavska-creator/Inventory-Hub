@@ -664,16 +664,21 @@ button {
 }
 
 .search-head {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr;
   align-items: center;
-  justify-content: space-between;
   gap: 10px;
 }
 
 .search-head-actions {
   display: flex;
   align-items: center;
+  justify-self: end;
   gap: 8px;
+}
+
+.quick-actions {
+  display: none;
 }
 
 .search-close-btn {
@@ -1811,15 +1816,18 @@ button {
   }
 
   .item-card-forestry {
-    background: #eef8f1;
+    background: linear-gradient(135deg, #dff6e7, #c7efd7);
+    border-color: rgba(20, 168, 109, 0.18);
   }
 
   .item-card-mlw {
-    background: #fcf0f0;
+    background: linear-gradient(135deg, #fde4e4, #f8cfcf);
+    border-color: rgba(207, 43, 43, 0.18);
   }
 
   .item-card-mixed {
-    background: #f7f4ef;
+    background: linear-gradient(135deg, #f4efe7, #ece4d7);
+    border-color: rgba(160, 121, 54, 0.16);
   }
 
   .item-card-neutral {
