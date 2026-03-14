@@ -884,8 +884,11 @@ function bindEvents() {
     }
   });
   elements.searchCloseBtn.addEventListener("click", () => {
+    elements.searchInput.value = "";
     elements.searchInput.blur();
     document.body.classList.remove("search-active");
+    resetRenderLimit();
+    renderInventory();
   });
   elements.vanOnlyToggle.addEventListener("change", () => {
     resetRenderLimit();

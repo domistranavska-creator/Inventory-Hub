@@ -682,12 +682,7 @@ button {
 }
 
 .search-wrap-primary::before {
-  content: "";
-  position: absolute;
-  inset: 1px;
-  border-radius: 27px;
-  border: 1px solid rgba(255, 255, 255, 0.34);
-  pointer-events: none;
+  display: none;
 }
 
 .filter-row {
