@@ -1688,6 +1688,10 @@ button {
     font-size: 0.8rem;
   }
 
+  .list {
+    padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+  }
+
   .item-actions {
     width: 100%;
     display: grid;

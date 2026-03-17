@@ -1,110 +1,8 @@
 const SHEET_ITEMS = "Items";
 const SHEET_RECORDS = "Records";
 const KROS_API_BASE_URL = "https://api-economy.kros.sk/api";
+const KROS_SYNC_MINUTES = 10;
 const GL_INVENTORY_API_URL = "https://script.google.com/macros/s/AKfycbxv9B4OFFtTTEKWAUF_L5sB1AJiBEIlcujZ_A4Zm7yOHr93iGGyVyENQ8TluA8Eh6-t4g/exec";
-
-const FALLBACK_ITEM_CODES = [
-  "10-30-23",
-  "111M/11T",
-  "111M-10",
-  "111M-11",
-  "111M-12",
-  "111M-13",
-  "111M-14",
-  "111M-15",
-  "111M-16",
-  "111M-17",
-  "111M-18",
-  "111M-19",
-  "111M-20",
-  "111M-21",
-  "111M-22",
-  "111M-23",
-  "111M-24",
-  "111M-25",
-  "111M-26",
-  "111M-27",
-  "111M-28",
-  "111M-29",
-  "111M-30",
-  "111M-32",
-  "111M-33",
-  "111M-8",
-  "1467-250",
-  "1497MBF550",
-  "1RM-11",
-  "1RM-12",
-  "1RM-13",
-  "1RM-18",
-  "1RM-19",
-  "1RM-21",
-  "1RM-22",
-  "1RM-30",
-  "1RM-7",
-  "2101PG-160",
-  "2535L",
-  "2600-19-XT-HP",
-  "2628 G-180",
-  "3625RM-65",
-  "3625RM-75",
-  "3625RM-90",
-  "40B-35-60",
-  "40B-60-90",
-  "4106-150-230",
-  "4106-35-60",
-  "4212-14-6T",
-  "4542-A",
-  "4543-3",
-  "4543-30",
-  "4750FB5A",
-  "4750FB5B",
-  "481-300",
-  "481-500",
-  "5515T-52",
-  "6M/10C",
-  "6M/S8",
-  "6M/SH8",
-  "7455-100",
-  "74WR-100",
-  "74WR-200",
-  "7750SL",
-  "808050L",
-  "808050P",
-  "8150SL",
-  "9029-T",
-  "9031",
-  "9033",
-  "903T-1",
-  "903T-2",
-  "9071",
-  "9072",
-  "ADJUST3",
-  "B198.110.150",
-  "B198.120.150",
-  "BE1GP514",
-  "BE-8030",
-  "BE-8040",
-  "BE-8150",
-  "BE-8600",
-  "BE-8610",
-  "BE-8620",
-  "BE-8800",
-  "BE-8810",
-  "BE-8820",
-  "BE-8905",
-  "BE-8910",
-  "BE-8915",
-  "BE-8920",
-  "BE-8925",
-  "BE-8930",
-  "BE-9770",
-  "BE-9770i",
-  "BE-9777B",
-  "BE-9881i",
-  "BFRL11",
-  "BLE300",
-  "BLE305"
-];
 
 function runSyncKrosItems() {
   return syncItemsFromKros_();
@@ -172,9 +70,9 @@ function getItems_() {
     .map((row) => ({
       sku: readText_(row, ["sku", "code", "item code", "article number", "art. no."]),
       name: readText_(row, ["name", "item name"]),
-      stockQty: readSignedNumber_(row, ["stockqty", "stock qty", "quantity", "qty", "kros qty", "kros stock"]),
-      ltQty: readSignedNumber_(row, ["ltqty", "lt qty"]),
-      prQty: readSignedNumber_(row, ["prqty", "pr qty"])
+      stockQty: readNumber_(row, ["stockqty", "stock qty", "quantity", "qty", "kros qty", "kros stock"]),
+      ltQty: readNumber_(row, ["ltqty", "lt qty"]),
+      prQty: readNumber_(row, ["prqty", "pr qty"])
     }))
     .filter((item) => item.sku);
 }
@@ -187,69 +85,36 @@ function getRecords_() {
     .map((row) => ({
       sku: readText_(row, ["sku"]),
       location: readText_(row, ["location"]),
-      vanQty: readNonNegativeNumber_(row, ["vanqty", "van qty", "qty"]),
+      vanQty: readNumber_(row, ["vanqty", "van qty", "qty"]),
       name: readText_(row, ["name"])
     }))
     .filter((record) => record.sku);
 }
 
 function syncItemsFromKros_() {
-  const lock = LockService.getScriptLock();
-  if (!lock.tryLock(1000)) {
-    Logger.log("KROS sync skipped because another run is already in progress.");
-    return 0;
+  const token = getKrosToken_();
+  if (!token) {
+    throw new Error('Missing script property "KROS_TOKEN"');
   }
 
-  try {
-    const token = getKrosToken_();
-    if (!token) {
-      throw new Error('Missing script property "KROS_TOKEN"');
-    }
+  const items = fetchAllKrosCatalogItems_(token);
+  const sheet = getOrCreateSheet_(SHEET_ITEMS);
+  ensureHeaders_(sheet, ["sku", "name", "stockQty", "ltQty", "prQty"]);
+  sheet.getRange(2, 1, Math.max(sheet.getMaxRows() - 1, 1), 5).clearContent();
 
-    const baseItems = fetchAllKrosCatalogItems_(token);
-    const existingMap = {};
-
-    baseItems.forEach(function(item) {
-      existingMap[item.sku] = true;
-    });
-
-    const missingCodes = FALLBACK_ITEM_CODES.filter(function(code) {
-      return !existingMap[code];
-    });
-
-    const fallbackData = fetchFallbackItemsByItemCode_(token, missingCodes);
-    const mergedItems = dedupeKrosItems_(baseItems.concat(fallbackData.items));
-
-    const sheet = getOrCreateSheet_(SHEET_ITEMS);
-    ensureHeaders_(sheet, ["sku", "name", "stockQty", "ltQty", "prQty"]);
-    sheet.clearContents();
-    sheet.getRange(1, 1, 1, 5).setValues([["sku", "name", "stockQty", "ltQty", "prQty"]]);
-
-    if (mergedItems.length) {
-      const values = mergedItems.map(function(item) {
-        return [item.sku, item.name, item.stockQty, item.ltQty, item.prQty];
-      });
-      sheet.getRange(2, 1, values.length, 5).setValues(values);
-    }
-
-    PropertiesService.getScriptProperties().setProperty("KROS_LAST_SYNC_AT", String(Date.now()));
-    Logger.log(
-      "KROS sync finished. Base=%s FallbackFound=%s FallbackMissing=%s Final=%s",
-      baseItems.length,
-      fallbackData.foundCount,
-      fallbackData.missingCount,
-      mergedItems.length
-    );
-
-    return mergedItems.length;
-  } finally {
-    lock.releaseLock();
+  if (items.length) {
+    const values = items.map((item) => [item.sku, item.name, item.stockQty, item.ltQty, item.prQty]);
+    sheet.getRange(2, 1, values.length, 5).setValues(values);
   }
+
+  PropertiesService.getScriptProperties().setProperty("KROS_LAST_SYNC_AT", String(Date.now()));
+  return items.length;
 }
 
 function fetchAllKrosCatalogItems_(token) {
   const results = [];
   const top = 100;
+  const overlap = 10;
   let skip = 0;
   let page = 0;
 
@@ -260,7 +125,14 @@ function fetchAllKrosCatalogItems_(token) {
       .filter((item) => item.sku);
 
     page += 1;
-    Logger.log("KROS page %s skip=%s batch=%s", page, skip, batch.length);
+    Logger.log(
+      "KROS page %s skip=%s top=%s batch=%s unique=%s",
+      page,
+      skip,
+      top,
+      batch.length,
+      dedupeKrosItems_(batch).length
+    );
 
     results.push.apply(results, batch);
 
@@ -268,120 +140,18 @@ function fetchAllKrosCatalogItems_(token) {
       break;
     }
 
-    skip += top;
-    Utilities.sleep(400);
-  }
-
-  return dedupeKrosItems_(results);
-}
-
-function fetchFallbackItemsByItemCode_(token, itemCodes) {
-  const items = [];
-  let foundCount = 0;
-  let missingCount = 0;
-
-  itemCodes.forEach(function(itemCode, index) {
-    let item = null;
-
-    try {
-      item = fetchSingleItemByItemCode_(token, itemCode);
-    } catch (error) {
-      Logger.log("Fallback itemCode=%s error=%s", itemCode, error.message || error);
-    }
-
-    if (item) {
-      items.push(item);
-      foundCount += 1;
-    } else {
-      missingCount += 1;
-    }
-
-    Logger.log(
-      "Fallback %s/%s itemCode=%s status=%s",
-      index + 1,
-      itemCodes.length,
-      itemCode,
-      item ? "FOUND" : "NOT_FOUND"
-    );
-
+    skip += (top - overlap);
     Utilities.sleep(350);
-  });
-
-  return {
-    items: items,
-    foundCount: foundCount,
-    missingCount: missingCount
-  };
-}
-
-function fetchSingleItemByItemCode_(token, itemCode) {
-  const variants = [
-    { kind: "itemCode", param: "itemCode", value: itemCode, top: 1 },
-    { kind: "itemCode", param: "itemCode", value: itemCode, top: 25 },
-    { kind: "itemCode", param: "itemCode", value: itemCode, top: 100 },
-    { kind: "search", param: "search", value: itemCode, top: 100 },
-    { kind: "name", param: "search", value: "Bahco " + itemCode, top: 100 }
-  ];
-
-  for (let i = 0; i < variants.length; i += 1) {
-    const variant = variants[i];
-    const url = KROS_API_BASE_URL + "/catalog-items?top=" + variant.top + "&" + variant.param + "=" + encodeURIComponent(variant.value);
-    const parsed = fetchJsonWithRetryByUrl_(url, token, 6);
-
-    const candidates = extractArrayPayload_(parsed)
-      .map(mapKrosCatalogItem_)
-      .filter(function(item) { return item.sku; });
-
-    for (let j = 0; j < candidates.length; j += 1) {
-      if (variant.kind === "itemCode" && sameItemCode_(candidates[j].sku, itemCode)) {
-        return candidates[j];
-      }
-
-      if (variant.kind === "search" && sameItemCode_(candidates[j].sku, itemCode)) {
-        return candidates[j];
-      }
-
-      if (variant.kind === "name" && nameMatchesItemCode_(candidates[j].name, itemCode)) {
-        return candidates[j];
-      }
-    }
   }
 
-  return null;
-}
-
-function fetchJsonWithRetryByUrl_(url, token, maxAttempts) {
-  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    const response = UrlFetchApp.fetch(url, {
-      method: "get",
-      muteHttpExceptions: true,
-      headers: {
-        Authorization: "Bearer " + token,
-        Accept: "application/json"
-      }
-    });
-
-    const status = response.getResponseCode();
-    const body = response.getContentText();
-
-    if (status >= 200 && status < 300) {
-      return JSON.parse(body);
-    }
-
-    if ((status === 429 || status === 503) && attempt < maxAttempts) {
-      Utilities.sleep(700 * attempt);
-      continue;
-    }
-
-    throw new Error("KROS fallback API error " + status + ": " + body);
-  }
-
-  throw new Error("KROS fallback API retry failed.");
+  const deduped = dedupeKrosItems_(results);
+  Logger.log("KROS sync total raw=%s unique=%s", results.length, deduped.length);
+  return deduped;
 }
 
 function fetchKrosPageWithRetry_(token, top, skip) {
   const url = KROS_API_BASE_URL + "/catalog-items?top=" + top + "&skip=" + skip;
-  const maxAttempts = 5;
+  const maxAttempts = 6;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     const response = UrlFetchApp.fetch(url, {
@@ -400,8 +170,8 @@ function fetchKrosPageWithRetry_(token, top, skip) {
       return JSON.parse(body);
     }
 
-    if ((status === 429 || status === 503) && attempt < maxAttempts) {
-      Utilities.sleep(1200 * attempt);
+    if (status === 429 && attempt < maxAttempts) {
+      Utilities.sleep(1000 * attempt);
       continue;
     }
 
@@ -435,13 +205,14 @@ function mapKrosCatalogItem_(item) {
   const warehouses = item && item.warehouses && item.warehouses.length
     ? item.warehouses
     : [];
-
+  const warehouseQty = warehouses.reduce(function(sum, warehouse) {
+    return sum + Number(warehouse.quantityOnHand || 0);
+  }, 0);
   const ltQty = warehouses.reduce(function(sum, warehouse) {
     return safeTrim_(warehouse.code) === "LT"
       ? sum + Number(warehouse.quantityOnHand || 0)
       : sum;
   }, 0);
-
   const prQty = warehouses.reduce(function(sum, warehouse) {
     return safeTrim_(warehouse.code) === "PR"
       ? sum + Number(warehouse.quantityOnHand || 0)
@@ -463,9 +234,18 @@ function mapKrosCatalogItem_(item) {
         item.description
       )
     ),
-    stockQty: toInteger_(ltQty + prQty),
-    ltQty: toInteger_(ltQty),
-    prQty: toInteger_(prQty)
+    stockQty: toPositiveInt_(
+      item && (
+        item.quantityOnHand ||
+        item.quantityInStock ||
+        item.quantity ||
+        item.stockQty ||
+        item.amount ||
+        warehouseQty
+      )
+    ),
+    ltQty: toPositiveInt_(ltQty),
+    prQty: toPositiveInt_(prQty)
   };
 }
 
@@ -589,7 +369,7 @@ function saveRecords_(records) {
     .map((record) => ({
       sku: safeTrim_(record && record.sku),
       location: safeTrim_(record && record.location),
-      vanQty: toNonNegativeInt_(record && (record.vanQty != null ? record.vanQty : record.qty)),
+      vanQty: toPositiveInt_(record && (record.vanQty != null ? record.vanQty : record.qty)),
       name: safeTrim_(record && record.name)
     }))
     .filter((record) => record.sku);
@@ -684,7 +464,7 @@ function readText_(row, keys) {
   return "";
 }
 
-function readSignedNumber_(row, keys) {
+function readNumber_(row, keys) {
   for (let i = 0; i < keys.length; i += 1) {
     const key = normalizeHeader_(keys[i]);
     const value = row[key];
@@ -692,38 +472,10 @@ function readSignedNumber_(row, keys) {
       continue;
     }
 
-    return toInteger_(value);
+    return toPositiveInt_(value);
   }
 
   return 0;
-}
-
-function readNonNegativeNumber_(row, keys) {
-  for (let i = 0; i < keys.length; i += 1) {
-    const key = normalizeHeader_(keys[i]);
-    const value = row[key];
-    if (value == null || value === "") {
-      continue;
-    }
-
-    return toNonNegativeInt_(value);
-  }
-
-  return 0;
-}
-
-function sameItemCode_(left, right) {
-  return normalizeItemCode_(left) === normalizeItemCode_(right);
-}
-
-function normalizeItemCode_(value) {
-  return safeTrim_(value).replace(/\s+/g, "").toUpperCase();
-}
-
-function nameMatchesItemCode_(name, itemCode) {
-  const normalizedName = normalizeItemCode_(name);
-  const normalizedCode = normalizeItemCode_(itemCode);
-  return normalizedName.indexOf(normalizedCode) !== -1;
 }
 
 function normalizeHeader_(value) {
@@ -736,12 +488,7 @@ function safeTrim_(value) {
   return String(value || "").trim();
 }
 
-function toInteger_(value) {
-  const parsed = parseInt(value, 10);
-  return isFinite(parsed) ? parsed : 0;
-}
-
-function toNonNegativeInt_(value) {
+function toPositiveInt_(value) {
   const parsed = parseInt(value, 10);
   return isFinite(parsed) && parsed > 0 ? parsed : 0;
 }

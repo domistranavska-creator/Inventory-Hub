@@ -57,7 +57,12 @@ function normalizeText(value) {
     .trim();
 }
 
-function parsePositiveInteger(value) {
+function parseInteger(value) {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function parseNonNegativeInteger(value) {
   const parsed = Number.parseInt(value, 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 }
@@ -77,7 +82,7 @@ function sanitizeRecord(record) {
     sku: String(record && record.sku ? record.sku : "").trim(),
     name: String(record && record.name ? record.name : "").trim(),
     location: String(record && record.location ? record.location : "").trim(),
-    vanQty: parsePositiveInteger(record && (
+    vanQty: parseNonNegativeInteger(record && (
       record.vanQty ??
       record.van_qty ??
       record.qty
@@ -99,19 +104,19 @@ function sanitizeInventoryItem(item) {
   return {
     sku: String(item && (item.sku ?? item.code ?? item["Item Code"]) ? (item.sku ?? item.code ?? item["Item Code"]) : "").trim(),
     name: String(item && (item.name ?? item["Item Name"]) ? (item.name ?? item["Item Name"]) : "").trim(),
-    stockQty: parsePositiveInteger(item && (
+    stockQty: parseInteger(item && (
       item.stockQty ??
       item.stock_qty ??
       item.quantity ??
       item.qty ??
       item["Stock Qty"]
     )),
-    ltQty: parsePositiveInteger(item && (
+    ltQty: parseInteger(item && (
       item.ltQty ??
       item.lt_qty ??
       item["LT Qty"]
     )),
-    prQty: parsePositiveInteger(item && (
+    prQty: parseInteger(item && (
       item.prQty ??
       item.pr_qty ??
       item["PR Qty"]
@@ -372,14 +377,14 @@ function getFilteredRows() {
   if (ltOnly || prOnly) {
     filtered = filtered.filter((row) => {
       if (ltOnly && prOnly) {
-        return row.ltQty > 0 || row.prQty > 0;
+        return row.ltQty !== 0 || row.prQty !== 0;
       }
 
       if (ltOnly) {
-        return row.ltQty > 0;
+        return row.ltQty !== 0;
       }
 
-      return row.prQty > 0;
+      return row.prQty !== 0;
     });
   }
 
@@ -536,11 +541,11 @@ function renderInventory() {
 
   elements.results.innerHTML = rows.map((row) => {
     const status = rowStatus(row);
-    const cardClass = row.ltQty > 0 && row.prQty > 0
+    const cardClass = row.ltQty !== 0 && row.prQty !== 0
       ? "item-card-mixed"
-      : row.ltQty > 0
+      : row.ltQty !== 0
         ? "item-card-forestry"
-        : row.prQty > 0
+        : row.prQty !== 0
           ? "item-card-mlw"
           : "item-card-neutral";
     const storageBlocks = [
@@ -964,10 +969,10 @@ function bindEvents() {
   elements.cancelModalBtn.addEventListener("click", closeModal);
   elements.confirmBtn.addEventListener("click", submitModal);
   elements.incQtyBtn.addEventListener("click", () => {
-    elements.qtyInput.value = String(parsePositiveInteger(elements.qtyInput.value) + 1);
+    elements.qtyInput.value = String(parseNonNegativeInteger(elements.qtyInput.value) + 1);
   });
   elements.decQtyBtn.addEventListener("click", () => {
-    elements.qtyInput.value = String(Math.max(0, parsePositiveInteger(elements.qtyInput.value) - 1));
+    elements.qtyInput.value = String(Math.max(0, parseNonNegativeInteger(elements.qtyInput.value) - 1));
   });
   elements.modalBack.addEventListener("click", (event) => {
     if (event.target === elements.modalBack) {
