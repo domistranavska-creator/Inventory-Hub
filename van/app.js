@@ -19,6 +19,7 @@ const state = {
 };
 
 const elements = {};
+let modalBackdropPressStarted = false;
 
 function byId(id) {
   return document.getElementById(id);
@@ -650,6 +651,7 @@ function openCreateModal() {
 }
 
 function closeModal() {
+  modalBackdropPressStarted = false;
   elements.modalBack.classList.add("hidden");
   elements.modalBack.setAttribute("aria-hidden", "true");
 }
@@ -974,8 +976,13 @@ function bindEvents() {
   elements.decQtyBtn.addEventListener("click", () => {
     elements.qtyInput.value = String(Math.max(0, parseNonNegativeInteger(elements.qtyInput.value) - 1));
   });
+  elements.modalBack.addEventListener("pointerdown", (event) => {
+    modalBackdropPressStarted = event.target === elements.modalBack;
+  });
   elements.modalBack.addEventListener("click", (event) => {
-    if (event.target === elements.modalBack) {
+    const shouldClose = modalBackdropPressStarted && event.target === elements.modalBack;
+    modalBackdropPressStarted = false;
+    if (shouldClose) {
       closeModal();
     }
   });
